@@ -21,7 +21,6 @@ import jsonpath
 # user_agents.txt为User-Agent列表，用于随机选择User-Agent
 # 文件夹格式为题号-题目标题，目录下有题目和题解两个MD文件
 
-
 # 请从浏览器中获取cookie
 # 登录后更改cookie，否则无法爬取题解
 cookie = {
@@ -31,6 +30,11 @@ cookie = {
     'C3VK': 'aa6e71',
 }
 
+difficulty_var = None
+source_options = None
+keyword_entry = None
+result_text = None
+source_vars = None
 
 # 获取json格式的数据包
 def Get_info():
@@ -307,28 +311,164 @@ def center_widgets(frame):
     inner_frame.rowconfigure(2, weight=1)
 
 
-# 主函数，程序的开始
-if __name__ == '__main__':
-    # 创建主窗口
-    root = tk.Tk()
-    root.title("爬虫GUI")
-    root.geometry("400x300")  # 设置窗口大小
+# 编写搜索函数
+def perform_search():
+    # 从 info.json 文件中读取题目数据
+    def load_problem_data():
+        try:
+            with open('info.json', 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data
+        except FileNotFoundError:
+            return []
 
-    # 创建一个容器，用于承载不同的页面
-    container = tk.Frame(root)
-    container.pack(fill="both", expand=True)
+    # 在你的代码中调用这个函数来加载题目数据
+    题目数据 = load_problem_data()
 
-    # 创建主页面
-    main_frame = tk.Frame(container)
-    main_frame.grid(row=0, column=0, sticky="nsew")
+    # 获取用户选择的难度、标签和关键词
+    selected_difficulty = difficulty_var.get()
+    selected_sources = [source_options[i] for i, var in enumerate(source_vars) if var.get()]
+    keyword = keyword_entry.get().lower()  # 转换为小写，方便不区分大小写搜索
 
-    # 在主页面上添加按钮，用于进入子页面1和子页面2
-    crawler_button = tk.Button(main_frame, text="进入爬虫", command=lambda: show_frame(page1_frame))
-    crawler_button.grid(row=0, column=0, pady=45)
-    data_management_button = tk.Button(main_frame, text="数据管理", command=lambda: show_frame(page2_frame))
-    data_management_button.grid(row=1, column=0, pady=45)
+    # 清空之前的搜索结果
+    result_text.delete(1.0, tk.END)
 
-    #################################################
+    # 初始化一个变量，用于检测是否找到了匹配的题目
+    found = False
+
+    # 遍历题目数据，根据用户选择和关键词进行筛选
+    for 题目 in 题目数据:
+        难度匹配 = selected_difficulty == "所有难度" or selected_difficulty == 题目["难度"]
+        标签匹配 = not selected_sources or any(source in selected_sources for source in 题目["标签"])
+        关键词匹配 = not keyword or keyword in 题目["题目"].lower() or any(
+            keyword in tag.lower() for tag in 题目["标签"])
+
+        # 如果所有条件匹配，将题目信息添加到结果中
+        if 难度匹配 and 标签匹配 and 关键词匹配:
+            result_text.insert(tk.END,
+                               f"题号：{题目['题号']}\n题目：{题目['题目']}\n难度：{题目['难度']}\n标签：{', '.join(题目['标签'])}\n\n")
+            found = True  # 找到匹配的题目
+
+    # 如果未找到内容，弹出提示框，并将所有选择清空
+    if not found:
+        messagebox.showinfo("未找到", "未找到匹配的题目。")
+        # 清空选择
+        difficulty_var.set("所有难度")
+        for var in source_vars:
+            var.set(False)
+        keyword_entry.delete(0, tk.END)  # 清空关键词搜索框
+
+
+# 从info.json文件中读取标签种类
+def get_tags_from_json():
+    try:
+        with open('info.json', 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            tags_set = set()  # 使用集合来存储不同的标签
+            for item in data:
+                tags_set.update(item['标签'])
+            return list(tags_set)
+    except FileNotFoundError:
+        return []
+
+
+# 编写函数来获取用户选择的标签
+def get_selected_tags():
+    # 获取标签选项
+    source_options = get_tags_from_json()
+    selected_tags = [source_options[i] for i, var in enumerate(source_vars) if var.get()]
+    return selected_tags
+
+
+# 创建清空数据库的函数
+def clear_database():
+    # 弹出确认提示框
+    confirm = messagebox.askokcancel("确认清空", "您确定要清空数据库吗？")
+
+    if confirm:
+        # 获取 data 目录的路径
+        data_directory = "./data"
+
+        # 检查 data 目录是否存在
+        if os.path.exists(data_directory):
+            # 遍历 data 目录下的所有文件和子目录，并删除它们
+            for item in os.listdir(data_directory):
+                item_path = os.path.join(data_directory, item)
+                if os.path.isfile(item_path):
+                    os.remove(item_path)
+                elif os.path.isdir(item_path):
+                    for sub_item in os.listdir(item_path):
+                        sub_item_path = os.path.join(item_path, sub_item)
+                        os.remove(sub_item_path)
+                    os.rmdir(item_path)
+
+            # 清空 info.json 文件
+            info_json_path = "./info.json"
+            if os.path.exists(info_json_path):
+                os.remove(info_json_path)
+
+            messagebox.showinfo("数据库清空", "数据库和 info.json 文件已成功清空。")
+        else:
+            messagebox.showwarning("目录不存在", "data 目录不存在，无法清空数据库。")
+
+
+def build_page2():
+    # 创建子页面2
+    page2_frame = tk.Frame(container)
+    page2_frame.grid(row=0, column=0, sticky="nsew")
+
+    # 在数据管理界面上添加返回首页按钮
+    back_to_main_page1 = tk.Button(page2_frame, text="返回首页", command=lambda: show_frame(main_frame))
+    back_to_main_page1.grid(row=0, column=0, pady=10, padx=10, sticky="nw")
+
+    # 创建一个 LabelFrame 来组织难度和标签选择框
+    filter_frame = tk.LabelFrame(page2_frame, text="筛选条件")
+    filter_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nw")
+
+    # 创建难度选择框
+    difficulty_label = tk.Label(filter_frame, text="选择题目难度:")
+    difficulty_label.grid(row=0, column=0, padx=5, pady=5)
+    difficulty_var = tk.StringVar()
+    difficulty_var.set("所有难度")  # 默认值
+    difficulty_option = tk.OptionMenu(filter_frame, difficulty_var, "所有难度", "入门", "普及", "提高", "省选", "NOI",
+                                      "CTSC")
+    difficulty_option.grid(row=0, column=1, padx=5, pady=5)
+
+    # 创建算法/来源多选框
+    source_label = tk.Label(filter_frame, text="选择标签:")
+    source_label.grid(row=1, column=0, padx=5, pady=5)
+
+    source_vars = []  # 用于存储每个选项的变量
+    source_checkboxes = []  # 用于存储每个 Checkbutton 控件
+
+    # 获取标签选项
+    source_options = get_tags_from_json()
+
+    for i, option in enumerate(source_options):
+        var = tk.BooleanVar()
+        source_vars.append(var)
+        checkbox = tk.Checkbutton(filter_frame, text=option, variable=var)
+        checkbox.grid(row=1 + i, column=1, padx=5, pady=5, sticky="w")
+        source_checkboxes.append(checkbox)
+
+    # 创建关键词搜索框
+    keyword_label = tk.Label(page2_frame, text="关键词搜索:")
+    keyword_label.grid(row=2, column=0, padx=10, pady=5)
+    keyword_entry = tk.Entry(page2_frame)
+    keyword_entry.grid(row=2, column=1, padx=10, pady=5)
+
+    # 搜索按钮
+    search_button = tk.Button(page2_frame, text="搜索", command=perform_search)
+    search_button.grid(row=3, column=0, columnspan=2, pady=10)
+
+    # 结果显示区域
+    result_text = tk.Text(page2_frame, wrap=tk.WORD, width=40, height=10)
+    result_text.grid(row=4, column=0, columnspan=2, padx=10, pady=10)
+
+    return page2_frame
+
+
+def build_page1():
     # 创建子页面1（爬虫界面）
     page1_frame = tk.Frame(container)
     page1_frame.grid(row=0, column=0, sticky="nsew")  # 使用 grid 布局管理器
@@ -339,17 +479,34 @@ if __name__ == '__main__':
 
     # 将输入框和按钮自适应居中
     center_widgets(page1_frame)
-    #################################################
 
-    # 创建子页面2
-    page2_frame = tk.Frame(container)
-    page2_frame.grid(row=0, column=0, sticky="nsew")
+    return page1_frame
 
-    # 在数据管理界面上添加返回首页按钮
-    back_to_main_page1 = tk.Button(page2_frame, text="返回首页", command=lambda: show_frame(main_frame))
-    back_to_main_page1.grid(row=0, column=0, pady=45)
 
-    #################################################
+# 主函数，程序的开始
+if __name__ == '__main__':
+    # 创建主窗口
+    root = tk.Tk()
+    root.title("欢迎使用洛谷爬虫工具")
+    root.geometry("400x850")  # 设置窗口大小
+
+    # 创建一个容器，用于承载不同的页面
+    container = tk.Frame(root)
+    container.pack(fill="both", expand=True)
+
+    # 创建主页面
+    main_frame = tk.Frame(container)
+    main_frame.grid(row=0, column=0, sticky="nsew")
+
+    # 在主页面上添加按钮，用于进入子页面1和子页面2
+    crawler_button = tk.Button(main_frame, text="进入爬虫", command=lambda: show_frame(build_page1()))
+    crawler_button.grid(row=0, column=0, pady=45)
+    data_management_button = tk.Button(main_frame, text="数据管理", command=lambda: show_frame(build_page2()))
+    data_management_button.grid(row=1, column=0, pady=45)
+    # 创建清空数据库按钮
+    clear_button = tk.Button(main_frame, text="清空数据库", command=clear_database)
+    clear_button.grid(row=2, column=0, pady=45)
+
     # 初始显示主页面
     show_frame(main_frame)
 
