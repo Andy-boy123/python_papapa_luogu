@@ -31,7 +31,7 @@ cookie = {
     'C3VK': 'aa6e71',
 }
 
-global difficulty_var, source_options, keyword_entry, result_text, source_vars, database_info_label, source_listbox, progress_window, progress_label, progress_bar
+global difficulty_var, source_options, keyword_entry, result_text, source_vars, database_info_label, source_listbox, progress_window, progress_label, progress_bar, text_output, progress_bar
 # 全局变量，用于存储窗口的原始尺寸
 original_window_size = "400x200"
 # 在页面上添加一个全局变量来存储进度条窗口的引用
@@ -44,10 +44,10 @@ def update_progress():
 
 # 创建进度条窗口
 def create_progress_window():
-    global progress_window, progress_bar
+    global progress_window, progress_bar, text_output, progress_label
     progress_window = tk.Toplevel(root)
     progress_window.title("爬取进度")
-    progress_window.geometry("300x100")
+    progress_window.geometry("400x200")
 
     # 创建一个不确定滚动的进度条
     progress_bar = ttk.Progressbar(progress_window, mode='indeterminate')
@@ -55,6 +55,10 @@ def create_progress_window():
 
     progress_label = tk.Label(progress_window, text="努力爬取中，请稍候...")
     progress_label.pack()
+
+    # 创建一个文本框来输出内容
+    text_output = tk.Text(progress_window, wrap=tk.WORD)
+    text_output.pack(fill=tk.BOTH, expand=True)
 
     progress_window.protocol("WM_DELETE_WINDOW", lambda: None)  # 禁用关闭按钮
 
@@ -81,7 +85,7 @@ def update_database_info():
 
     global database_info_label
     # 更新数据库信息文本
-    database_info_label.config(text=f"数据库条数: {num_of_folders}   软件版本: V0.0.1")
+    database_info_label.config(text=f"数据库条数: {num_of_folders}   软件版本: V0.0")
 
 
 # 获取json格式的数据包
@@ -156,6 +160,8 @@ def Get_info(anum, bnum):
             ts.append(wen)
         # 显示第几页已经保存
         print(f'第{page}页已经保存')
+        text_output.insert(tk.END, f'第{page}页已经保存\n')
+        text_output.see(tk.END)
         # 将数据写入JSON文件
         with open('info.json', 'w', encoding='utf-8') as f:
             json.dump(ts, f, ensure_ascii=False, indent=4)
@@ -168,6 +174,8 @@ def Get_MD(html):
     core = bs.select("article")[0]
     while not core:
         print("正在重试...")
+        text_output.insert(tk.END, "正在重试...\n")
+        text_output.see(tk.END)
         core = bs.select("article")[0]
 
     md = str(core)
@@ -209,6 +217,8 @@ def Get_Problem_title(problemID):
     # 生成要访问的url
     url = 'https://www.luogu.com.cn/problem/P' + str(problemID)
     print('----------- 正在爬取 ' + str(problemID) + ' ------------')
+    text_output.insert(tk.END, '----------- 正在爬取 ' + str(problemID) + ' ------------\n')
+    text_output.see(tk.END)
     # 从user_agents.txt里随机选择一行，作为本次请求的User-Agent
     with open('user_agents.txt', 'r') as f:
         lines = f.readlines()
@@ -239,8 +249,12 @@ def start_work(anum, bnum):
 
     # 开始爬取info pagenum从1到178
     print("正在爬取info...")
+    text_output.insert(tk.END, "正在爬取info...\n")
+    text_output.see(tk.END)  # 滚动到文本框底部显示新的消息
     Get_info(anum, bnum)
     print("info爬取成功！")
+    text_output.insert(tk.END, "info爬取成功！\n")
+    text_output.see(tk.END)  # 滚动到文本框底部显示新的消息
     bnum += 1
     # problemID为题目编号，从1000开始到9617结束
     for problemID in range(anum, bnum):
@@ -255,8 +269,12 @@ def start_work(anum, bnum):
         title = Get_Problem_title(problemID)
         # 打印提示信息
         print('题目标题：' + str(title))
+        text_output.insert(tk.END, '题目标题：' + str(title) + '\n')
+        text_output.see(tk.END)
         # 打印提示信息
         print('正在爬取题目...')
+        text_output.insert(tk.END, '正在爬取题目...\n')
+        text_output.see(tk.END)
 
         # 获取html
         # 从user_agents.txt里随机选择一行，作为本次请求的User-Agent
@@ -275,13 +293,19 @@ def start_work(anum, bnum):
         # 判断是否爬取成功
         if html == 'error':
             print('题目爬取失败！')
+            text_output.insert(tk.END, '题目爬取失败！\n')
+            text_output.see(tk.END)
 
         else:
             print('已获取题目网页源码！')
+            text_output.insert(tk.END, '已获取题目网页源码！\n')
+            text_output.see(tk.END)
 
             # 调用函数，传入html，获取题目MD文件
             problemMD = Get_MD(html)
             print("获取题目MD文件成功！")
+            text_output.insert(tk.END, "获取题目MD文件成功！\n")
+            text_output.see(tk.END)
 
             # 将题目编号-题目标题作为文件名
             filename = 'P' + str(problemID) + '-' + str(title) + '.md'
@@ -290,16 +314,24 @@ def start_work(anum, bnum):
             if not os.path.exists('data/' + 'P' + str(problemID) + '-' + str(title)):
                 os.mkdir('data/' + 'P' + str(problemID) + '-' + str(title))
                 print('已创建文件夹：P' + str(problemID) + '-' + str(title))
+                text_output.insert(tk.END, '已创建文件夹：P' + str(problemID) + '-' + str(title) + '\n')
+                text_output.see(tk.END)
             else:
                 print('文件夹已存在，无需创建！')
+                text_output.insert(tk.END, '文件夹已存在，无需创建！\n')
+                text_output.see(tk.END)
             # 将文件保存到data目录下
             with open('data/' + 'P' + str(problemID) + '-' + str(title) + '/' + filename, 'w', encoding='utf-8') as f:
                 f.write(problemMD)
             # 打印提示信息
             print('题目爬取成功！')
+            text_output.insert(tk.END, '题目爬取成功！\n')
+            text_output.see(tk.END)
 
         # 开始爬取题解
         print("正在爬取题解...")
+        text_output.insert(tk.END, "正在爬取题解...\n")
+        text_output.see(tk.END)
 
         # 获取题解url
         url = 'https://www.luogu.com.cn/problem/solution/P' + str(problemID)
@@ -311,12 +343,18 @@ def start_work(anum, bnum):
         # 判断是否爬取成功
         if html == 'error':
             print("题解爬取失败！")
+            text_output.insert(tk.END, "题解爬取失败！\n")
+            text_output.see(tk.END)
         else:
             print("已获取题解网页源码！")
+            text_output.insert(tk.END, "已获取题解网页源码！\n")
+            text_output.see(tk.END)
 
             # 调用函数，传入html，获取题解MD文件
             solutionMD = Get_TJ_MD(html)
             print("获取题解MD文件成功！")
+            text_output.insert(tk.END, "获取题解MD文件成功！\n")
+            text_output.see(tk.END)
 
             # 将题目编号-题目标题-题解作为文件名
             filename = 'P' + str(problemID) + '-' + str(title) + '-题解.md'
@@ -327,6 +365,8 @@ def start_work(anum, bnum):
 
             # 打印提示信息
             print('题解爬取成功！')
+            text_output.insert(tk.END, '题解爬取成功！\n')
+            text_output.see(tk.END)
 
     # 更新数据库条数信息
     update_database_info()
@@ -334,6 +374,8 @@ def start_work(anum, bnum):
     # 打印提示信息
     print('\n')
     print('所有题目爬取完毕！')
+    text_output.insert(tk.END, '\n')
+    text_output.see(tk.END)
 
     # 关闭进度条窗口
     close_progress_window()
