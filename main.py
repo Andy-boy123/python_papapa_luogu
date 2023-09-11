@@ -9,6 +9,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox, Scrollbar, Listbox
 import json
 import jsonpath
+import threading
 
 # difficultty = {'入门':'1','普及-':'2','普及/提高-':'3','普及+/提高':'4','提高+/省选-':'5','省选/NOI-':'6','NOI/NOI+/CTSC':'7','尚无评定':'9'}
 
@@ -30,9 +31,41 @@ cookie = {
     'C3VK': 'aa6e71',
 }
 
-global difficulty_var, source_options, keyword_entry, result_text, source_vars, database_info_label, source_listbox
+global difficulty_var, source_options, keyword_entry, result_text, source_vars, database_info_label, source_listbox, progress_window, progress_label, progress_bar
 # 全局变量，用于存储窗口的原始尺寸
 original_window_size = "400x200"
+# 在页面上添加一个全局变量来存储进度条窗口的引用
+
+
+def update_progress():
+    progress_bar.step(1)  # 更新进度条的值
+    progress_window.after(2, update_progress)  # 100毫秒后再次调用update_progress函数，实现循环滚动
+
+
+# 创建进度条窗口
+def create_progress_window():
+    global progress_window, progress_bar
+    progress_window = tk.Toplevel(root)
+    progress_window.title("爬取进度")
+    progress_window.geometry("300x100")
+
+    # 创建一个不确定滚动的进度条
+    progress_bar = ttk.Progressbar(progress_window, mode='indeterminate')
+    progress_bar.pack(pady=20)
+
+    progress_label = tk.Label(progress_window, text="努力爬取中，请稍候...")
+    progress_label.pack()
+
+    progress_window.protocol("WM_DELETE_WINDOW", lambda: None)  # 禁用关闭按钮
+
+    # 开始周期性地更新进度条
+    update_progress()
+
+
+# 关闭进度条窗口
+def close_progress_window():
+    if progress_window and progress_window.winfo_exists():
+        progress_window.destroy()
 
 
 def update_database_info():
@@ -202,6 +235,8 @@ def Get_Problem_title(problemID):
 
 
 def start_work(anum, bnum):
+    create_progress_window()
+
     # 开始爬取info pagenum从1到178
     print("正在爬取info...")
     Get_info(anum, bnum)
@@ -300,6 +335,8 @@ def start_work(anum, bnum):
     print('\n')
     print('所有题目爬取完毕！')
 
+    # 关闭进度条窗口
+    close_progress_window()
     # 弹出提示框，并提示爬取成功题目的数量
     messagebox.showinfo(title='提示', message='所有题目爬取完毕！')
 
@@ -316,6 +353,7 @@ def show_frame(frame, window_size=None):
 def center_widgets(frame):
     # 创建开始按钮，并绑定点击事件
     def start_button_click():
+        global progress_window
         left_range = left_range_entry.get()
         right_range = right_range_entry.get()
         # 验证输入的开始题号和结束题号是否有效
@@ -330,9 +368,12 @@ def center_widgets(frame):
             # 如果输入的不是整数，弹出错误提示框
             messagebox.showerror("错误", "请输入有效的整数题号")
             return
+        # 验证通过后，开始工作（实际爬取任务）
+        # start_work(int(left_range), int(right_range))
 
-        # 验证通过后，开始工作
-        start_work(int(left_range), int(right_range))
+        # 启动爬虫线程
+        crawl_thread = threading.Thread(target=lambda: start_work(left_range, right_range))
+        crawl_thread.start()
 
     # 在 Frame 上创建一个内部 Frame，以包装输入框和按钮
     inner_frame = tk.Frame(frame)
