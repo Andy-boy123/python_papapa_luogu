@@ -686,6 +686,3 @@ if __name__ == '__main__':
 
     # 运行主循环
     root.mainloop()
-
-    # 运行主循环
-    root.mainloop()
