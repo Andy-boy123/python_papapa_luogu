@@ -83,6 +83,7 @@ def Get_info(anum, bnum):
     # //是整除符号
     a = (anum - 1000) // 50 + 1
     b = (bnum - 1000) // 50 + 1
+
     for page in range(a, b + 1):
         # page = 1
         url = f'https://www.luogu.com.cn/problem/list?page={page}'
@@ -90,8 +91,21 @@ def Get_info(anum, bnum):
         urlParse = re.findall('decodeURIComponent\((.*?)\)\)', html)[0]
         htmlParse = json.loads(urllib.parse.unquote(urlParse)[1:-1])
         result = list(jsonpath.jsonpath(htmlParse, '$.currentData.problems.result')[0])
+
         for res in result:
             pid = jsonpath.jsonpath(res, '$.pid')[0]
+
+            # 定义ppid,将pid中的P去掉
+            ppid = pid[1:]
+
+            # 当pid小于anum时，跳过本次循环
+            if int(ppid) < anum:
+                continue
+
+            # 当pid大于bnum时，跳出循环
+            if int(ppid) > bnum:
+                break
+
             title = jsonpath.jsonpath(res, '$.title')[0]
             difficulty = arr[int(jsonpath.jsonpath(res, '$.difficulty')[0])]
             tags_s = list(jsonpath.jsonpath(res, '$.tags')[0])
