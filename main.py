@@ -6,7 +6,7 @@ import re
 import time
 import urllib.parse
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import ttk, messagebox, Scrollbar, Listbox
 import json
 import jsonpath
 
@@ -30,14 +30,29 @@ cookie = {
     'C3VK': 'aa6e71',
 }
 
-difficulty_var = None
-source_options = None
-keyword_entry = None
-result_text = None
-source_vars = None
+global difficulty_var, source_options, keyword_entry, result_text, source_vars, database_info_label, source_listbox
+# 全局变量，用于存储窗口的原始尺寸
+original_window_size = "400x200"
+
+
+def update_database_info():
+    global database_info_label
+
+    # 从 data 目录中获取文件夹的数量
+    data_directory = "./data"
+    if os.path.exists(data_directory):
+        num_of_folders = len(
+            [name for name in os.listdir(data_directory) if os.path.isdir(os.path.join(data_directory, name))])
+    else:
+        num_of_folders = 0
+
+    global database_info_label
+    # 更新数据库信息文本
+    database_info_label.config(text=f"数据库条数: {num_of_folders}   软件版本: V0.0.1")
+
 
 # 获取json格式的数据包
-def Get_info():
+def Get_info(anum, bnum):
     headers = {
         "authority": "www.luogu.com.cn",
         "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
@@ -59,41 +74,44 @@ def Get_info():
     tags_dicts = []
     tags_tag = list(jsonpath.jsonpath(tag_html, '$.tags')[0])
     for tag in tags_tag:
-        if jsonpath.jsonpath(tag, '$.type')[0] == 1 or jsonpath.jsonpath(tag, '$.type')[0] == 4 or \
-                jsonpath.jsonpath(tag, '$.type')[0] == 3:
+        if jsonpath.jsonpath(tag, '$.type')[0] != 1 or jsonpath.jsonpath(tag, '$.type')[0] != 4 or \
+                jsonpath.jsonpath(tag, '$.type')[0] != 3:
             tags_dicts.append({'id': jsonpath.jsonpath(tag, '$.id')[0], 'name': jsonpath.jsonpath(tag, '$.name')[0]})
 
     arr = ['暂无评定', '入门', '普及−', '普及/提高−', '普及+/提高', '提高+/省选−', '省选/NOI−', 'NOI/NOI+/CTSC']
     ts = []
-    # for page in range(1, 179):
-    page = 1
-    url = f'https://www.luogu.com.cn/problem/list?page={page}'
-    html = requests.get(url=url, headers=headers).text
-    urlParse = re.findall('decodeURIComponent\((.*?)\)\)', html)[0]
-    htmlParse = json.loads(urllib.parse.unquote(urlParse)[1:-1])
-    result = list(jsonpath.jsonpath(htmlParse, '$.currentData.problems.result')[0])
-    for res in result:
-        pid = jsonpath.jsonpath(res, '$.pid')[0]
-        title = jsonpath.jsonpath(res, '$.title')[0]
-        difficulty = arr[int(jsonpath.jsonpath(res, '$.difficulty')[0])]
-        tags_s = list(jsonpath.jsonpath(res, '$.tags')[0])
-        tags = []
-        for ta in tags_s:
-            for tags_dict in tags_dicts:
-                if tags_dict.get('id') == ta:
-                    tags.append(tags_dict.get('name'))
-        wen = {
-            "题号": pid,
-            "题目": title,
-            "标签": tags,
-            "难度": difficulty
-        }
-        ts.append(wen)
-    # 显示第几页已经保存
-    print(f'第{page}页已经保存')
-    # 将数据写入JSON文件
-    with open('info.json', 'w', encoding='utf-8') as f:
-        json.dump(ts, f, ensure_ascii=False, indent=4)
+    # //是整除符号
+    a = (anum - 1000) // 50 + 1
+    b = (bnum - 1000) // 50 + 1
+    for page in range(a, b + 1):
+        # page = 1
+        url = f'https://www.luogu.com.cn/problem/list?page={page}'
+        html = requests.get(url=url, headers=headers).text
+        urlParse = re.findall('decodeURIComponent\((.*?)\)\)', html)[0]
+        htmlParse = json.loads(urllib.parse.unquote(urlParse)[1:-1])
+        result = list(jsonpath.jsonpath(htmlParse, '$.currentData.problems.result')[0])
+        for res in result:
+            pid = jsonpath.jsonpath(res, '$.pid')[0]
+            title = jsonpath.jsonpath(res, '$.title')[0]
+            difficulty = arr[int(jsonpath.jsonpath(res, '$.difficulty')[0])]
+            tags_s = list(jsonpath.jsonpath(res, '$.tags')[0])
+            tags = []
+            for ta in tags_s:
+                for tags_dict in tags_dicts:
+                    if tags_dict.get('id') == ta:
+                        tags.append(tags_dict.get('name'))
+            wen = {
+                "题号": pid,
+                "题目": title,
+                "标签": tags,
+                "难度": difficulty
+            }
+            ts.append(wen)
+        # 显示第几页已经保存
+        print(f'第{page}页已经保存')
+        # 将数据写入JSON文件
+        with open('info.json', 'w', encoding='utf-8') as f:
+            json.dump(ts, f, ensure_ascii=False, indent=4)
 
 
 def Get_MD(html):
@@ -172,7 +190,7 @@ def Get_Problem_title(problemID):
 def start_work(anum, bnum):
     # 开始爬取info pagenum从1到178
     print("正在爬取info...")
-    Get_info()
+    Get_info(anum, bnum)
     print("info爬取成功！")
     bnum += 1
     # problemID为题目编号，从1000开始到9617结束
@@ -261,6 +279,9 @@ def start_work(anum, bnum):
             # 打印提示信息
             print('题解爬取成功！')
 
+    # 更新数据库条数信息
+    update_database_info()
+
     # 打印提示信息
     print('\n')
     print('所有题目爬取完毕！')
@@ -270,17 +291,33 @@ def start_work(anum, bnum):
 
 
 # 创建函数，用于切换页面
-def show_frame(frame):
+def show_frame(frame, window_size=None):
     frame.tkraise()
+
+    # 如果提供了窗口尺寸，就使用它来设置窗口大小
+    if window_size:
+        root.geometry(window_size)
 
 
 def center_widgets(frame):
     # 创建开始按钮，并绑定点击事件
     def start_button_click():
-        # left_range = left_range_entry.get()
-        # right_range = right_range_entry.get()
-        left_range = 1000
-        right_range = 1049
+        left_range = left_range_entry.get()
+        right_range = right_range_entry.get()
+        # 验证输入的开始题号和结束题号是否有效
+        try:
+            left_range = int(left_range)
+            right_range = int(right_range)
+            if left_range < 1000 or 9635 < right_range < left_range:
+                # 如果题号不在有效范围内，弹出错误提示框
+                messagebox.showerror("错误", "题号范围无效，请输入1000-9634之间的题号，且开始题号不能大于结束题号")
+                return
+        except ValueError:
+            # 如果输入的不是整数，弹出错误提示框
+            messagebox.showerror("错误", "请输入有效的整数题号")
+            return
+
+        # 验证通过后，开始工作
         start_work(int(left_range), int(right_range))
 
     # 在 Frame 上创建一个内部 Frame，以包装输入框和按钮
@@ -288,16 +325,16 @@ def center_widgets(frame):
     inner_frame.grid(row=1, column=1, padx=10, pady=10, sticky="nsew")  # 使用 grid 布局管理器
 
     # 在内部 Frame 上添加左范围输入框
-    left_range_label = tk.Label(inner_frame, text="开始题号:1000")
+    left_range_label = tk.Label(inner_frame, text="开始题号:")
     left_range_label.grid(row=0, column=0, pady=9)
-    # left_range_entry = tk.Entry(inner_frame)
-    # left_range_entry.grid(row=0, column=1, pady=9)
+    left_range_entry = tk.Entry(inner_frame)
+    left_range_entry.grid(row=0, column=1, pady=9)
 
     # 在内部 Frame 上添加右范围输入框
-    right_range_label = tk.Label(inner_frame, text="结束题号:1049")
+    right_range_label = tk.Label(inner_frame, text="结束题号:")
     right_range_label.grid(row=1, column=0, pady=9)
-    # right_range_entry = tk.Entry(inner_frame)
-    # right_range_entry.grid(row=1, column=1, pady=9)
+    right_range_entry = tk.Entry(inner_frame)
+    right_range_entry.grid(row=1, column=1, pady=9)
 
     # 在内部 Frame 上添加开始按钮
     start_button = tk.Button(inner_frame, text="开始爬取", command=start_button_click)
@@ -313,6 +350,8 @@ def center_widgets(frame):
 
 # 编写搜索函数
 def perform_search():
+    global difficulty_var, source_options, keyword_entry, result_text, source_vars, source_listbox
+
     # 从 info.json 文件中读取题目数据
     def load_problem_data():
         try:
@@ -325,9 +364,12 @@ def perform_search():
     # 在你的代码中调用这个函数来加载题目数据
     题目数据 = load_problem_data()
 
+    # 获取用户选择的标签选项
+    selected_tags_indices = source_listbox.curselection()
+    selected_tags = [source_options[i] for i in selected_tags_indices]
+
     # 获取用户选择的难度、标签和关键词
     selected_difficulty = difficulty_var.get()
-    selected_sources = [source_options[i] for i, var in enumerate(source_vars) if var.get()]
     keyword = keyword_entry.get().lower()  # 转换为小写，方便不区分大小写搜索
 
     # 清空之前的搜索结果
@@ -339,7 +381,7 @@ def perform_search():
     # 遍历题目数据，根据用户选择和关键词进行筛选
     for 题目 in 题目数据:
         难度匹配 = selected_difficulty == "所有难度" or selected_difficulty == 题目["难度"]
-        标签匹配 = not selected_sources or any(source in selected_sources for source in 题目["标签"])
+        标签匹配 = not selected_tags or any(tag in selected_tags for tag in 题目["标签"])
         关键词匹配 = not keyword or keyword in 题目["题目"].lower() or any(
             keyword in tag.lower() for tag in 题目["标签"])
 
@@ -354,8 +396,7 @@ def perform_search():
         messagebox.showinfo("未找到", "未找到匹配的题目。")
         # 清空选择
         difficulty_var.set("所有难度")
-        for var in source_vars:
-            var.set(False)
+        source_listbox.selection_clear(0, tk.END)  # 清除标签多选框的选择
         keyword_entry.delete(0, tk.END)  # 清空关键词搜索框
 
 
@@ -408,18 +449,27 @@ def clear_database():
                 os.remove(info_json_path)
 
             messagebox.showinfo("数据库清空", "数据库和 info.json 文件已成功清空。")
+
+            # 更新数据库信息
+            update_database_info()
         else:
             messagebox.showwarning("目录不存在", "data 目录不存在，无法清空数据库。")
 
 
+# 数据库管理界面
 def build_page2():
+    global difficulty_var, source_options, keyword_entry, result_text, source_vars, database_info_label, source_listbox
+
+    # 设置窗口尺寸
+    root.geometry("500x600")
+
     # 创建子页面2
     page2_frame = tk.Frame(container)
     page2_frame.grid(row=0, column=0, sticky="nsew")
 
     # 在数据管理界面上添加返回首页按钮
-    back_to_main_page1 = tk.Button(page2_frame, text="返回首页", command=lambda: show_frame(main_frame))
-    back_to_main_page1.grid(row=0, column=0, pady=10, padx=10, sticky="nw")
+    back_to_main_page2 = tk.Button(page2_frame, text="返回首页", command=return_to_main_page)
+    back_to_main_page2.grid(row=0, column=0, pady=10)
 
     # 创建一个 LabelFrame 来组织难度和标签选择框
     filter_frame = tk.LabelFrame(page2_frame, text="筛选条件")
@@ -430,26 +480,26 @@ def build_page2():
     difficulty_label.grid(row=0, column=0, padx=5, pady=5)
     difficulty_var = tk.StringVar()
     difficulty_var.set("所有难度")  # 默认值
-    difficulty_option = tk.OptionMenu(filter_frame, difficulty_var, "所有难度", "入门", "普及", "提高", "省选", "NOI",
-                                      "CTSC")
+    difficulty_option = tk.OptionMenu(filter_frame, difficulty_var, "暂无评定", "入门", "普及−", "普及/提高−",
+                                      "普及+/提高", "提高+/省选−", "省选/NOI−", "NOI/NOI+/CTSC")
     difficulty_option.grid(row=0, column=1, padx=5, pady=5)
 
-    # 创建算法/来源多选框
+    # 创建标签多选框和滚动条
     source_label = tk.Label(filter_frame, text="选择标签:")
     source_label.grid(row=1, column=0, padx=5, pady=5)
 
-    source_vars = []  # 用于存储每个选项的变量
-    source_checkboxes = []  # 用于存储每个 Checkbutton 控件
+    source_scrollbar = Scrollbar(filter_frame, orient=tk.VERTICAL)
+    source_scrollbar.grid(row=1, column=2, pady=5, sticky="ns")
 
-    # 获取标签选项
+    source_listbox = Listbox(filter_frame, selectmode=tk.MULTIPLE, yscrollcommand=source_scrollbar.set)
+    source_listbox.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+
+    # 获取标签选项并将其添加到 Listbox 中
     source_options = get_tags_from_json()
+    for option in source_options:
+        source_listbox.insert(tk.END, option)
 
-    for i, option in enumerate(source_options):
-        var = tk.BooleanVar()
-        source_vars.append(var)
-        checkbox = tk.Checkbutton(filter_frame, text=option, variable=var)
-        checkbox.grid(row=1 + i, column=1, padx=5, pady=5, sticky="w")
-        source_checkboxes.append(checkbox)
+    source_scrollbar.config(command=source_listbox.yview)
 
     # 创建关键词搜索框
     keyword_label = tk.Label(page2_frame, text="关键词搜索:")
@@ -468,27 +518,41 @@ def build_page2():
     return page2_frame
 
 
+# 爬虫界面
 def build_page1():
+    global database_info_label
+    # 设置窗口尺寸
+    root.geometry("400x200")
     # 创建子页面1（爬虫界面）
     page1_frame = tk.Frame(container)
     page1_frame.grid(row=0, column=0, sticky="nsew")  # 使用 grid 布局管理器
 
     # 在爬虫界面上添加返回首页按钮
-    back_to_main_page1 = tk.Button(page1_frame, text="返回首页", command=lambda: show_frame(main_frame))
-    back_to_main_page1.grid(row=0, column=0, pady=45)
+    back_to_main_page1 = tk.Button(page1_frame, text="返回首页", command=return_to_main_page)
+    back_to_main_page1.grid(row=0, column=0, pady=10)
 
-    # 将输入框和按钮自适应居中
+    # 在子页面1上创建输入框和按钮
     center_widgets(page1_frame)
 
     return page1_frame
+
+
+# 在主页面上添加返回首页按钮
+def return_to_main_page():
+    # 设置窗口的尺寸为默认尺寸
+    root.geometry("400x200")
+    show_frame(main_frame)
 
 
 # 主函数，程序的开始
 if __name__ == '__main__':
     # 创建主窗口
     root = tk.Tk()
-    root.title("欢迎使用洛谷爬虫工具")
-    root.geometry("400x850")  # 设置窗口大小
+    root.title("洛谷爬虫工具")
+    root.geometry("400x200")
+
+    # 设置窗口图标
+    root.iconbitmap("icon.ico")
 
     # 创建一个容器，用于承载不同的页面
     container = tk.Frame(root)
@@ -498,17 +562,33 @@ if __name__ == '__main__':
     main_frame = tk.Frame(container)
     main_frame.grid(row=0, column=0, sticky="nsew")
 
+    # 添加标题标签
+    title_label = tk.Label(main_frame, text="欢迎使用洛谷爬虫工具", font=("Arial", 16), padx=10, pady=10)
+    title_label.grid(row=0, column=0, columnspan=2)  # 使用 grid 布局管理器，跨两列
+
     # 在主页面上添加按钮，用于进入子页面1和子页面2
-    crawler_button = tk.Button(main_frame, text="进入爬虫", command=lambda: show_frame(build_page1()))
-    crawler_button.grid(row=0, column=0, pady=45)
-    data_management_button = tk.Button(main_frame, text="数据管理", command=lambda: show_frame(build_page2()))
-    data_management_button.grid(row=1, column=0, pady=45)
-    # 创建清空数据库按钮
-    clear_button = tk.Button(main_frame, text="清空数据库", command=clear_database)
-    clear_button.grid(row=2, column=0, pady=45)
+    crawler_button = ttk.Button(main_frame, text="进入爬虫", command=lambda: show_frame(build_page1()))
+    crawler_button.grid(row=1, column=0, pady=20)
+
+    data_management_button = ttk.Button(main_frame, text="数据管理", command=lambda: show_frame(build_page2()))
+    data_management_button.grid(row=1, column=1, pady=20)
+
+    # 创建一个清空数据库按钮，并绑定到clear_database函数
+    clear_database_button = ttk.Button(main_frame, text="清空数据库", command=clear_database)
+    clear_database_button.grid(row=1, column=2, pady=20)
+
+    # 创建一个 Label 组件来显示数据库条数和软件版本
+    database_info_label = tk.Label(main_frame, text="数据库条数: 0   软件版本: V0.0.1")
+    database_info_label.grid(row=2, column=0, columnspan=2, padx=10, pady=10, sticky="ne")  # 使用 grid 布局管理器，跨两列
+
+    # 初始化数据库信息标签
+    update_database_info()
 
     # 初始显示主页面
     show_frame(main_frame)
+
+    # 运行主循环
+    root.mainloop()
 
     # 运行主循环
     root.mainloop()
